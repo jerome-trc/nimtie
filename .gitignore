@@ -1,11 +1,33 @@
-# ignore files with no extention:
-*
-!*/
-!*.*
+# File system ##################################################################
+.DS_Store
+desktop.ini
 
-# normal ignores:
-*.exe
-nimcache
-*.pdb
-*.ilk
-.*
+# Text editor/IDE ##############################################################
+/.vs/**
+!/.vs/CMakeWorkspaceSettings.json
+.atomignore
+*.swp
+*.swo
+Session.vim
+.cproject
+.idea
+*.iml
+/.vscode/**
+!/.vscode/extension.json
+.VSCodeCounter
+.project
+.favorites.json
+.settings/
+
+# Build artifacts ##############################################################
+/nimcache
+/nimdoc
+/testresults
+
+# Miscellaneous ################################################################
+
+# perf output
+**/*perf.data*
+
+# not-perf output
+*.nperf
