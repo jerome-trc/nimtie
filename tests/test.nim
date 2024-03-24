@@ -1,4 +1,4 @@
-import genny
+import nimtie
 
 const simpleConst = 123
 

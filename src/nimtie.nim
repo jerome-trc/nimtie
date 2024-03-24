@@ -1,6 +1,6 @@
-import genny/internal, genny/languages/c, genny/languages/cpp,
-    genny/languages/nim, genny/languages/node, genny/languages/python,
-    genny/languages/zig, macros, strformat
+import nimtie/internal, nimtie/languages/c, nimtie/languages/cpp,
+    nimtie/languages/nim, nimtie/languages/node, nimtie/languages/python,
+    nimtie/languages/zig, macros, strformat
 
 template discard2(f: untyped): untyped =
   when(compiles do: discard f):
