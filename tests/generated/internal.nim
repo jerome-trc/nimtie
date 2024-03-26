@@ -3,7 +3,6 @@ when not defined(gcArc) and not defined(gcOrc):
 
 when (NimMajor, NimMinor, NimPatch) == (1, 6, 2):
   {.error: "Nim 1.6.2 not supported with NimTie due to FFI issues.".}
-
 proc test_simple_call*(a: int): int {.raises: [], cdecl, exportc, dynlib.} =
   simpleCall(a)
 

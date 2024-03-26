@@ -2,6 +2,56 @@ import nimtie/internal, nimtie/languages/c, nimtie/languages/cpp,
     nimtie/languages/nim, nimtie/languages/node, nimtie/languages/python,
     nimtie/languages/zig, macros, strformat
 
+type
+  BraceStyle* {.pure.} = enum
+    sameLine
+    newLine
+
+  RenameRule* {.pure.} = enum
+    none
+    geckoCase
+    lowerCase
+    upperCase
+    pascalCase
+    camelCase
+    snakeCase
+    upperSnakeCase
+
+  Target* {.pure.} = enum
+    ## What languages should bindings be generated for?
+    c
+    cxx
+    js
+    python
+    zig
+  Targets* = set[Target]
+    ## What languages should bindings be generated for?
+
+  CConfig* = object
+    ## Configuration for generated C bindings.
+    ## Note that some of these settings also apply to generated C++ bindings.
+    braceStyle*: BraceStyle = BraceStyle.sameLine
+    fixedWidthInt*: bool = true ## \
+      ## Whether to use `[u]int##_t` types instead of `int`, `long`, etc.
+    includeGuard*: string = "" ## \
+      ## Note that this is not mutually-exclusive with `pragmaOnce`.
+    includes*: seq[string] = @[] ## \
+      ## Each string is written as-is, so quotes or angle brackets must be included.
+    pragmaOnce*: bool = true ## \
+      ## Note that this is not mutually-exclusive with `includeGuard`.
+
+  Config* = object
+    ## Passed to `proc writeFiles`_.
+    directory*: string = "."
+    filename*: string = "mylib"
+    procPrefix*: string = "" ## \
+      ## Prepended to the name of every generated function binding.
+    structPrefix*: string = "" ## \
+      ## Prepended to the name of every generated struct declaration.
+    targets*: Targets = {} ## \
+      ## What languages should bindings be generated for?
+    cCfg*: CConfig
+
 template discard2(f: untyped): untyped =
   when(compiles do: discard f):
     discard f
@@ -351,13 +401,19 @@ template exportRefObject*(sym, body: untyped) =
   ## * procs
   exportRefObjectTyped(exportRefObjectUntyped(sym, body))
 
-macro writeFiles*(dir, lib: static[string]) =
+macro writeFiles*(config: static[Config]) =
   ## This needs to be and the end of the file and it needs to be followed by:
   ## `include generated/internal`
-  writeInternal(dir, lib)
-  writeNim(dir, lib)
-  writePy(dir, lib)
-  writeNode(dir, lib)
-  writeC(dir, lib)
-  writeCpp(dir, lib)
-  writeZig(dir, lib)
+  writeInternal(config.directory, config.filename)
+  writeNim(config.directory, config.filename)
+
+  if Target.c in config.targets:
+    writeC(config.directory, config.filename)
+  if Target.cxx in config.targets:
+    writeCpp(config.directory, config.filename)
+  if Target.python in config.targets:
+    writePy(config.directory, config.filename)
+  if Target.js in config.targets:
+    writeNode(config.directory, config.filename)
+  if Target.zig in config.targets:
+    writeZig(config.directory, config.filename)

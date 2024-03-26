@@ -113,6 +113,12 @@ exportSeq seq[string]:
 exportProcs:
   getDatas
 
-writeFiles("tests/generated", "test")
+const config = Config(
+  directory: "./tests/generated",
+  filename: "test",
+  targets: {Target.c, Target.cxx, Target.js, Target.python, Target.zig}
+)
+
+writeFiles(config)
 
 include generated/internal
