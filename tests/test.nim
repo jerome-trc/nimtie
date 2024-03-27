@@ -1,4 +1,4 @@
-import nimtie
+import nimtie, nimtie/config
 
 const simpleConst = 123
 
@@ -113,12 +113,12 @@ exportSeq seq[string]:
 exportProcs:
   getDatas
 
-const config = Config(
+const cfg = Config(
   directory: "./tests/generated",
   filename: "test",
   targets: {Target.c, Target.cxx, Target.js, Target.python, Target.zig}
 )
 
-writeFiles(config)
+writeFiles(cfg)
 
 include generated/internal

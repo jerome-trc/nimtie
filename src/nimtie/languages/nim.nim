@@ -1,4 +1,6 @@
-import ../common, macros, strformat, strutils
+import std/[macros, strformat, strutils]
+
+import ../config, ../common
 
 var
   types {.compiletime.}: string
@@ -360,7 +362,10 @@ type $LibError = object of ValueError
 
 """
 
-proc writeNim*(dir, lib: string) =
+proc writeNim*(cfg: Config) =
+  let dir = cfg.directory
+  let lib = cfg.filename
+
   writeFile( &"{dir}/{toSnakeCase(lib)}.nim", (header & types & procs)
     .replace("$Lib", lib).replace("$lib", toSnakeCase(lib))
   )

@@ -1,4 +1,6 @@
-import ../common, macros, strformat, strutils
+import std/[macros, strformat, strutils]
+
+import ../config, ../common
 
 var
   types {.compiletime.}: string
@@ -437,7 +439,10 @@ const footer = """
 
 """
 
-proc writeNode*(dir, lib: string) =
+proc writeNode*(cfg: Config) =
+  let dir = cfg.directory
+  let lib = cfg.filename
+
   writeFile(
     &"{dir}/{toSnakeCase(lib)}.js",
     (header & types & loader & procs & footer & exports)

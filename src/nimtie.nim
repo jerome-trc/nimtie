@@ -356,16 +356,16 @@ template exportRefObject*(sym, body: untyped) =
 macro writeFiles*(config: static[Config]) =
   ## This needs to be and the end of the file and it needs to be followed by:
   ## `include generated/internal`
-  writeInternal(config.directory, config.filename)
-  writeNim(config.directory, config.filename)
+  writeInternal(config)
+  writeNim(config)
 
   if Target.c in config.targets:
-    writeC(config.directory, config.filename)
+    writeC(config)
   if Target.cxx in config.targets:
-    writeCpp(config.directory, config.filename)
+    writeCpp(config)
   if Target.python in config.targets:
-    writePy(config.directory, config.filename)
+    writePy(config)
   if Target.js in config.targets:
-    writeNode(config.directory, config.filename)
+    writeNode(config)
   if Target.zig in config.targets:
-    writeZig(config.directory, config.filename)
+    writeZig(config)

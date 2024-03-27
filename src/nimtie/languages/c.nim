@@ -1,4 +1,6 @@
-import ../common, macros, strformat, strutils
+import std/[macros, strformat, strutils]
+
+import ../config, ../common
 
 var
   types {.compiletime.}: string
@@ -241,7 +243,10 @@ const footer = """
 #endif
 """
 
-proc writeC*(dir, lib: string) =
+proc writeC*(cfg: Config) =
+  let dir = cfg.directory
+  let lib = cfg.filename
+
   writeFile(&"{dir}/{toSnakeCase(lib)}.h", (header & types & procs & footer)
     .replace("$lib", toSnakeCase(lib)).replace("$LIB", lib.toUpperAscii())
   )

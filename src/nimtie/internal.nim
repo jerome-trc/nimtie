@@ -1,4 +1,6 @@
-import common, languages/nim, macros, strformat, strutils
+import std/[macros, strformat, strutils]
+
+import config, common, languages/nim
 
 const exportProcPragmas = "{.raises: [], cdecl, exportc, dynlib.}"
 
@@ -255,7 +257,10 @@ when (NimMajor, NimMinor, NimPatch) == (1, 6, 2):
   {.error: "Nim 1.6.2 not supported with NimTie due to FFI issues.".}
 """
 
-proc writeInternal*(dir, lib: string) =
+proc writeInternal*(cfg: Config) =
+  let dir = cfg.directory
+  let lib = cfg.filename
+
   writeFile(
     &"{dir}/internal.nim",
     header & internal.replace("$Lib", lib).replace("$lib", toSnakeCase(lib))
