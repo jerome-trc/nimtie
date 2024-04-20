@@ -233,20 +233,22 @@ proc exportSeqC*(sym: NimNode) =
     sym[1]
   )
 
-const header = """
-#ifndef INCLUDE_$LIB_H
-#define INCLUDE_$LIB_H
-
-"""
-
-const footer = """
-#endif
-"""
-
 proc writeC*(cfg: Config) =
-  let dir = cfg.directory
-  let lib = cfg.filename
+    let dir = cfg.directory
+    let lib = cfg.filename
 
-  writeFile(&"{dir}/{toSnakeCase(lib)}.h", (header & types & procs & footer)
-    .replace("$lib", toSnakeCase(lib)).replace("$LIB", lib.toUpperAscii())
-  )
+    var output = ""
+
+    if cfg.c.pragmaOnce:
+        output &= "#pragma once\n\n"
+
+    if cfg.c.includeGuard.len > 0:
+        output &= &"#ifndef {cfg.c.includeGuard}\n#define {cfg.c.includeGuard}\n\n"
+
+    output &= types.replace("$lib", cfg.c.structPrefix)
+    output &= procs.replace("$lib", cfg.c.procPrefix)
+
+    if cfg.c.includeGuard.len > 0:
+        output &= &"#endif // {cfg.c.includeGuard}\n"
+
+    writeFile(&"{dir}/{cfg.filename}.h", output)

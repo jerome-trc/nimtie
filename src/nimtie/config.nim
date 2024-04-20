@@ -35,15 +35,15 @@ type
       ## Each string is written as-is, so quotes or angle brackets must be included.
     pragmaOnce*: bool = true ## \
       ## Note that this is not mutually-exclusive with `includeGuard`.
+    procPrefix*: string = "" ## \
+      ## Prepended to the name of every generated function binding.
+    structPrefix*: string = "" ## \
+      ## Prepended to the name of every generated struct declaration.
 
   Config* = object
     ## Passed to `proc writeFiles`_.
     directory*: string = "."
     filename*: string = "mylib"
-    procPrefix*: string = "" ## \
-      ## Prepended to the name of every generated function binding.
-    structPrefix*: string = "" ## \
-      ## Prepended to the name of every generated struct declaration.
     targets*: Targets = {} ## \
       ## What languages should bindings be generated for?
-    cCfg*: CConfig
+    c*: CConfig
