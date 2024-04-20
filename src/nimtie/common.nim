@@ -18,70 +18,70 @@ const basicTypes* = [
 ]
 
 proc toSnakeCase*(s: string): string =
-  ## Converts NimType to nim_type.
-  var prevCap = false
-  for i, c in s:
-    if c in {'A' .. 'Z'}:
-      if result.len > 0 and result[^1] != '_' and not prevCap:
-        result.add '_'
-      prevCap = true
-      result.add c.toLowerAscii()
-    else:
-      prevCap = false
-      result.add c
+    ## Converts NimType to nim_type.
+    var prevCap = false
+    for i, c in s:
+        if c in {'A' .. 'Z'}:
+            if result.len > 0 and result[^1] != '_' and not prevCap:
+                result.add '_'
+            prevCap = true
+            result.add c.toLowerAscii()
+        else:
+            prevCap = false
+            result.add c
 
 proc toCapSnakeCase*(s: string): string =
-  ## Converts NimType to NIM_TYPE.
-  var prevCap = false
-  for i, c in s:
-    if c in {'A' .. 'Z'}:
-      if result.len > 0 and result[^1] != '_' and not prevCap:
-        result.add '_'
-      prevCap = true
-    else:
-      prevCap = false
-    result.add c.toUpperAscii()
+    ## Converts NimType to NIM_TYPE.
+    var prevCap = false
+    for i, c in s:
+        if c in {'A' .. 'Z'}:
+            if result.len > 0 and result[^1] != '_' and not prevCap:
+                result.add '_'
+            prevCap = true
+        else:
+            prevCap = false
+        result.add c.toUpperAscii()
 
 proc toCamelCase*(s: string): string =
-  ## Converts nim_type to NimType.
-  var cap = true
-  for i, c in s:
-    if c == '_':
-      cap = true
-    else:
-      if cap:
-        result.add c.toUpperAscii()
-        cap = false
-      else:
-        result.add c
+    ## Converts nim_type to NimType.
+    var cap = true
+    for i, c in s:
+        if c == '_':
+            cap = true
+        else:
+            if cap:
+                result.add c.toUpperAscii()
+                cap = false
+            else:
+                result.add c
 
 proc toVarCase*(s: string): string =
-  ## Converts NimType to nimType.
-  var i = 0
-  while i < s.len:
-    if s[i] notin {'A' .. 'Z'}:
-      break
+    ## Converts NimType to nimType.
+    var i = 0
+    while i < s.len:
+        if s[i] notin {'A' .. 'Z'}:
+            break
 
-    result.add s[i].toLowerAscii()
-    inc i
+        result.add s[i].toLowerAscii()
+        inc i
 
-  if i < s.len:
-    result.add s[i .. ^1]
+    if i < s.len:
+        result.add s[i .. ^1]
 
 proc getSeqName*(sym: NimNode): string =
-  if sym.kind == nnkBracketExpr:
-    result = &"Seq{sym[1]}"
-  else:
-    result = &"Seq{sym}"
-  result[3] = toUpperAscii(result[3])
+    if sym.kind == nnkBracketExpr:
+        result = &"Seq{sym[1]}"
+    else:
+        result = &"Seq{sym}"
+    result[3] = toUpperAscii(result[3])
 
 proc getName*(sym: NimNode): string =
-  if sym.kind == nnkBracketExpr:
-    sym.getSeqName()
-  else:
-    sym.repr
+    if sym.kind == nnkBracketExpr:
+        sym.getSeqName()
+    else:
+        sym.repr
 
 proc raises*(procSym: NimNode): bool =
-  for pragma in procSym.getImpl()[4]:
-    if pragma.kind == nnkExprColonExpr and pragma[0].repr == "raises":
-      return pragma[1].len > 0
+    for pragma in procSym.getImpl()[4]:
+        if pragma.kind == nnkExprColonExpr and pragma[0].repr == "raises":
+            return pragma[1].len > 0
