@@ -1,8 +1,7 @@
 import std/[macros, strformat]
 
 import nimtie/config
-import nimtie/internal
-import nimtie/languages/[c, cpp, nim, node, python, zig]
+import nimtie/languages/[c, cpp, node, python, zig]
 
 template discard2(f: untyped): untyped =
   when(compiles do: discard f):
@@ -34,8 +33,6 @@ macro exportConstsUntyped(body: untyped) =
 macro exportConstsTyped(body: typed) =
   for varSection in body.asStmtList:
     let sym = varSection[0][0]
-    exportConstInternal(sym)
-    exportConstNim(sym)
     exportConstPy(sym)
     exportConstNode(sym)
     exportConstC(sym)
@@ -58,8 +55,6 @@ macro exportEnumsUntyped(body: untyped) =
 macro exportEnumsTyped(body: typed) =
   for varSection in body.asStmtList:
     let sym = varSection[0][1]
-    exportEnumInternal(sym)
-    exportEnumNim(sym)
     exportEnumPy(sym)
     exportEnumNode(sym)
     exportEnumC(sym)
@@ -116,8 +111,6 @@ proc procTyped(
   prefixes: openarray[NimNode] = []
 ) =
   let procSym = procTypedSym(entry)
-  exportProcInternal(procSym, owner, prefixes)
-  exportProcNim(procSym, owner, prefixes)
   exportProcPy(procSym, owner, prefixes)
   exportProcNode(procSym, owner, prefixes)
   exportProcC(procSym, owner, prefixes)
@@ -177,8 +170,6 @@ macro exportObjectTyped(body: typed) =
     else:
       nil
 
-  exportObjectInternal(sym, constructor)
-  exportObjectNim(sym, constructor)
   exportObjectPy(sym, constructor)
   exportObjectNode(sym, constructor)
   exportObjectC(sym, constructor)
@@ -197,8 +188,6 @@ macro exportObjectTyped(body: typed) =
         let procType = procSym.getTypeInst()
         if procType[0].len > 2:
           prefixes.add(procType[0][2][1])
-      exportProcInternal(procSym, sym, prefixes)
-      exportProcNim(procSym, sym, prefixes)
       exportProcPy(procSym, sym, prefixes)
       exportProcNode(procSym, sym, prefixes)
       exportProcC(procSym, sym, prefixes)
@@ -236,8 +225,6 @@ macro exportSeqUntyped(sym, body: untyped) =
 macro exportSeqTyped(body: typed) =
   let sym = body.asStmtList()[0][0][1]
 
-  exportSeqInternal(sym)
-  exportSeqNim(sym)
   exportSeqPy(sym)
   exportSeqNode(sym)
   exportSeqC(sym)
@@ -315,8 +302,6 @@ macro exportRefObjectTyped(body: typed) =
     else:
       nil
 
-  exportRefObjectInternal(sym, fields, constructor)
-  exportRefObjectNim(sym, fields, constructor)
   exportRefObjectPy(sym, fields, constructor)
   exportRefObjectNode(sym, fields, constructor)
   exportRefObjectC(sym, fields, constructor)
@@ -335,8 +320,7 @@ macro exportRefObjectTyped(body: typed) =
         let procType = procSym.getTypeInst()
         if procType[0].len > 2:
           prefixes.add(procType[0][2][1])
-      exportProcInternal(procSym, sym, prefixes)
-      exportProcNim(procSym, sym, prefixes)
+
       exportProcPy(procSym, sym, prefixes)
       exportProcNode(procSym, sym, prefixes)
       exportProcC(procSym, sym, prefixes)
@@ -354,11 +338,6 @@ template exportRefObject*(sym, body: untyped) =
   exportRefObjectTyped(exportRefObjectUntyped(sym, body))
 
 macro writeFiles*(config: static[Config]) =
-  ## This needs to be and the end of the file and it needs to be followed by:
-  ## `include generated/internal`
-  writeInternal(config)
-  writeNim(config)
-
   if Target.c in config.targets:
     writeC(config)
   if Target.cxx in config.targets:
