@@ -17,9 +17,6 @@ type
         ## What languages should bindings be generated for?
         c
         cxx
-        js
-        python
-        zig
     Targets* = set[Target]
         ## What languages should bindings be generated for?
 

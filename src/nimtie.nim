@@ -1,7 +1,7 @@
 import std/[macros, strformat]
 
 import nimtie/config
-import nimtie/languages/[c, cpp, node, python, zig]
+import nimtie/languages/[c, cpp]
 
 template discard2(f: untyped): untyped =
     when(compiles do: discard f):
@@ -33,11 +33,8 @@ macro exportConstsUntyped(body: untyped) =
 macro exportConstsTyped(body: typed) =
     for varSection in body.asStmtList:
         let sym = varSection[0][0]
-        exportConstPy(sym)
-        exportConstNode(sym)
         exportConstC(sym)
         exportConstCpp(sym)
-        exportConstZig(sym)
 
 template exportConsts*(body: untyped) =
     ## Exports a list of constants.
@@ -55,11 +52,8 @@ macro exportEnumsUntyped(body: untyped) =
 macro exportEnumsTyped(body: typed) =
     for varSection in body.asStmtList:
         let sym = varSection[0][1]
-        exportEnumPy(sym)
-        exportEnumNode(sym)
         exportEnumC(sym)
         exportEnumCpp(sym)
-        exportEnumZig(sym)
 
 template exportEnums*(body: untyped) =
     ## Exports a list of enums.
@@ -111,11 +105,8 @@ proc procTyped(
   prefixes: openarray[NimNode] = []
 ) =
     let procSym = procTypedSym(entry)
-    exportProcPy(procSym, owner, prefixes)
-    exportProcNode(procSym, owner, prefixes)
     exportProcC(procSym, owner, prefixes)
     exportProcCpp(procSym, owner, prefixes)
-    exportProcZig(procSym, owner, prefixes)
 
 macro exportProcsUntyped(body: untyped) =
     result = newNimNode(nnkStmtList)
@@ -170,11 +161,8 @@ macro exportObjectTyped(body: typed) =
     else:
         nil
 
-    exportObjectPy(sym, constructor)
-    exportObjectNode(sym, constructor)
     exportObjectC(sym, constructor)
     exportObjectCpp(sym, constructor)
-    exportObjectZig(sym, constructor)
 
     if procsBlock[1].len > 0:
         var procsSeen: seq[string]
@@ -188,13 +176,9 @@ macro exportObjectTyped(body: typed) =
                 let procType = procSym.getTypeInst()
                 if procType[0].len > 2:
                     prefixes.add(procType[0][2][1])
-            exportProcPy(procSym, sym, prefixes)
-            exportProcNode(procSym, sym, prefixes)
             exportProcC(procSym, sym, prefixes)
             exportProcCpp(procSym, sym, prefixes)
-            exportProcZig(procSym, sym, prefixes)
 
-    exportCloseObjectZig()
     exportCloseObjectCpp()
 
 template exportObject*(sym, body: untyped) =
@@ -225,17 +209,13 @@ macro exportSeqUntyped(sym, body: untyped) =
 macro exportSeqTyped(body: typed) =
     let sym = body.asStmtList()[0][0][1]
 
-    exportSeqPy(sym)
-    exportSeqNode(sym)
     exportSeqC(sym)
     exportSeqCpp(sym)
-    exportSeqZig(sym)
 
     for entry in body.asStmtList()[1 .. ^1]:
         procTyped(entry, sym)
 
     exportCloseObjectCpp()
-    exportCloseObjectZig()
 
 template exportSeq*(sym, body: untyped) =
     ## Exports a regular sequence.
@@ -302,11 +282,8 @@ macro exportRefObjectTyped(body: typed) =
     else:
       nil
 
-    exportRefObjectPy(sym, fields, constructor)
-    exportRefObjectNode(sym, fields, constructor)
     exportRefObjectC(sym, fields, constructor)
     exportRefObjectCpp(sym, fields, constructor)
-    exportRefObjectZig(sym, fields, constructor)
 
     if procsBlock[1].len > 0:
         var procsSeen: seq[string]
@@ -321,14 +298,10 @@ macro exportRefObjectTyped(body: typed) =
                 if procType[0].len > 2:
                     prefixes.add(procType[0][2][1])
 
-            exportProcPy(procSym, sym, prefixes)
-            exportProcNode(procSym, sym, prefixes)
             exportProcC(procSym, sym, prefixes)
             exportProcCpp(procSym, sym, prefixes)
-            exportProcZig(procSym, sym, prefixes)
 
     exportCloseObjectCpp()
-    exportCloseObjectZig()
 
 template exportRefObject*(sym, body: untyped) =
     ## Exports a ref object, with these sections:
@@ -342,9 +315,3 @@ macro writeFiles*(config: static[Config]) =
         writeC(config)
     if Target.cxx in config.targets:
         writeCpp(config)
-    if Target.python in config.targets:
-        writePy(config)
-    if Target.js in config.targets:
-        writeNode(config)
-    if Target.zig in config.targets:
-        writeZig(config)

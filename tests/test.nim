@@ -116,9 +116,7 @@ exportProcs:
 const cfg = Config(
   directory: "./tests/generated",
   filename: "test",
-  targets: {Target.c, Target.cxx, Target.js, Target.python, Target.zig}
+  targets: {Target.c, Target.cxx}
 )
 
 writeFiles(cfg)
-
-include generated/internal
