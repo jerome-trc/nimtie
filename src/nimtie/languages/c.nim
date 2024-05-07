@@ -345,7 +345,17 @@ proc writeC*(cfg: Config) =
     output &= enumerations
     output &= typeDecls
     output &= typeDefs.replace("$lib", cfg.c.structPrefix)
+
+    if cfg.c.cxxCompat:
+        if cfg.c.braceStyle == BraceStyle.sameLine:
+            output &= "#ifdef __cplusplus\nextern \"C\" {\n#endif\n\n"
+        else:
+            output &= "#ifdef __cplusplus\nextern \"C\"\n{\n#endif\n"
+
     output &= procs.replace("$lib", cfg.c.procPrefix)
+
+    if cfg.c.cxxCompat:
+        output &= "#ifdef __cplusplus\n}\n#endif\n"
 
     if cfg.c.includeGuard.len > 0:
         output &= &"#endif // {cfg.c.includeGuard}\n"

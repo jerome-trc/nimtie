@@ -29,6 +29,7 @@ type
         ## Configuration for generated C bindings.
         ## Note that some of these settings also apply to generated C++ bindings.
         braceStyle*: BraceStyle = BraceStyle.sameLine
+        cxxCompat*: bool = false
         enumPrefix*: string = ""
         includeGuard*: string = "" ## \
             ## Note that this is not mutually-exclusive with `pragmaOnce`.
