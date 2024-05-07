@@ -9,6 +9,7 @@ template discard2(f: untyped): untyped =
     else:
         f
 
+
 proc asStmtList(body: NimNode): seq[NimNode] =
     ## Nim optimizes StmtList, reverse that:
     if body.kind != nnkStmtList:
@@ -17,11 +18,13 @@ proc asStmtList(body: NimNode): seq[NimNode] =
         for child in body:
             result.add(child)
 
+
 proc emptyBlockStmt(): NimNode =
     result = quote do:
         block:
             discard
     result[1].del(0)
+
 
 macro exportConstsUntyped(body: untyped) =
     result = newNimNode(nnkStmtList)
@@ -30,15 +33,18 @@ macro exportConstsUntyped(body: untyped) =
             var `ident` = `ident`
         result.add varSection
 
+
 macro exportConstsTyped(body: typed) =
     for varSection in body.asStmtList:
         let sym = varSection[0][0]
         exportConstC(sym)
         exportConstCpp(sym)
 
+
 template exportConsts*(body: untyped) =
     ## Exports a list of constants.
     exportConstsTyped(exportConstsUntyped(body))
+
 
 macro exportEnumsUntyped(body: untyped) =
     result = newNimNode(nnkStmtList)
@@ -49,15 +55,18 @@ macro exportEnumsUntyped(body: untyped) =
                 var `name`: `ident`
         result.add varSection
 
+
 macro exportEnumsTyped(body: typed) =
     for varSection in body.asStmtList:
         let sym = varSection[0][1]
         exportEnumC(sym)
         exportEnumCpp(sym)
 
+
 template exportEnums*(body: untyped) =
     ## Exports a list of enums.
     exportEnumsTyped(exportEnumsUntyped(body))
+
 
 proc fieldUntyped(clause, owner: NimNode): NimNode =
     result = emptyBlockStmt()
@@ -65,6 +74,7 @@ proc fieldUntyped(clause, owner: NimNode): NimNode =
         var
             obj: `owner`
             f = obj.`clause`
+
 
 proc procUntyped(clause: NimNode): NimNode =
     result = emptyBlockStmt()
@@ -89,6 +99,7 @@ proc procUntyped(clause: NimNode): NimNode =
             endStmt[1].add argName
         result[1].add endStmt
 
+
 proc procTypedSym(entry: NimNode): NimNode =
     result =
         if entry[1].kind == nnkVarSection:
@@ -99,28 +110,34 @@ proc procTypedSym(entry: NimNode): NimNode =
       else:
         entry[1][^1][0][0]
 
+
 proc procTyped(
-  entry: NimNode,
-  owner: NimNode = nil,
-  prefixes: openarray[NimNode] = []
+    cfg: Config,
+    entry: NimNode,
+    owner: NimNode = nil,
+    prefixes: openarray[NimNode] = []
 ) =
     let procSym = procTypedSym(entry)
-    exportProcC(procSym, owner, prefixes)
+    exportProcC(cfg, procSym, owner, prefixes)
     exportProcCpp(procSym, owner, prefixes)
+
 
 macro exportProcsUntyped(body: untyped) =
     result = newNimNode(nnkStmtList)
     for clause in body:
-        result.add procUntyped(clause)
+        result.add(procUntyped(clause))
 
-macro exportProcsTyped(body: typed) =
+
+macro exportProcsTyped(cfg: static[Config], body: typed) =
     for entry in body.asStmtList:
-        procTyped(entry)
+        procTyped(cfg, entry)
 
-template exportProcs*(body: untyped) =
+
+template exportProcs*(cfg: Config, body: untyped) =
     ## Exports a list of procs.
     ## Procs can just be a name `doX` or fully qualified with `doX(int): int`.
-    exportProcsTyped(exportProcsUntyped(body))
+    exportProcsTyped(cfg, exportProcsUntyped(body))
+
 
 macro exportObjectUntyped(sym, body: untyped) =
     result = newNimNode(nnkStmtList)
@@ -149,6 +166,7 @@ macro exportObjectUntyped(sym, body: untyped) =
     result.add constructorBlock
     result.add procsBlock
 
+
 macro exportObjectTyped(body: typed) =
     let
         sym = body[0][0][1]
@@ -161,7 +179,7 @@ macro exportObjectTyped(body: typed) =
     else:
         nil
 
-    exportObjectC(sym, constructor)
+    exportObjectC(Config(), sym, constructor)
     exportObjectCpp(sym, constructor)
 
     if procsBlock[1].len > 0:
@@ -176,10 +194,11 @@ macro exportObjectTyped(body: typed) =
                 let procType = procSym.getTypeInst()
                 if procType[0].len > 2:
                     prefixes.add(procType[0][2][1])
-            exportProcC(procSym, sym, prefixes)
+            exportProcC(Config(), procSym, sym, prefixes)
             exportProcCpp(procSym, sym, prefixes)
 
     exportCloseObjectCpp()
+
 
 template exportObject*(sym, body: untyped) =
     ## Exports an object, with these sections:
@@ -187,6 +206,7 @@ template exportObject*(sym, body: untyped) =
     ## * constructor
     ## * procs
     exportObjectTyped(exportObjectUntyped(sym, body))
+
 
 macro exportSeqUntyped(sym, body: untyped) =
     result = newNimNode(nnkStmtList)
@@ -206,21 +226,24 @@ macro exportSeqUntyped(sym, body: untyped) =
         else:
             error("Invalid section", section)
 
-macro exportSeqTyped(body: typed) =
+
+macro exportSeqTyped(cfg: static[Config], body: typed) =
     let sym = body.asStmtList()[0][0][1]
 
-    exportSeqC(sym)
+    exportSeqC(cfg, sym)
     exportSeqCpp(sym)
 
     for entry in body.asStmtList()[1 .. ^1]:
-        procTyped(entry, sym)
+        procTyped(cfg, entry, sym)
 
     exportCloseObjectCpp()
+
 
 template exportSeq*(sym, body: untyped) =
     ## Exports a regular sequence.
     ## * procs section
     exportSeqTyped(exportSeqUntyped(sym, body))
+
 
 macro exportRefObjectUntyped(sym, body: untyped) =
     result = newNimNode(nnkStmtList)
@@ -254,7 +277,8 @@ macro exportRefObjectUntyped(sym, body: untyped) =
     result.add constructorBlock
     result.add procsBlock
 
-macro exportRefObjectTyped(body: typed) =
+
+macro exportRefObjectTyped(cfg: static[Config], body: typed) =
     let
         sym = body[0][0][1]
         fieldsBlock = body[1]
@@ -262,31 +286,33 @@ macro exportRefObjectTyped(body: typed) =
         procsBlock = body[3]
 
     var fields: seq[(string, NimNode)]
+
     if fieldsBlock[1].len > 0:
         for entry in fieldsBlock[1].asStmtList:
             case entry[1][1][2].kind:
             of nnkCall:
                 fields.add((
-                  entry[1][1][2][0].repr,
-                  entry[1][1][2].getTypeInst()
+                    entry[1][1][2][0].repr,
+                    entry[1][1][2].getTypeInst()
                 ))
             else:
                 fields.add((
-                  entry[1][1][2][1].repr,
-                  entry[1][1][2][1].getTypeInst()
+                    entry[1][1][2][1].repr,
+                    entry[1][1][2][1].getTypeInst()
                 ))
 
     let constructor =
         if constructorBlock[1].len > 0:
-      procTypedSym(constructorBlock[1])
-    else:
-      nil
+            procTypedSym(constructorBlock[1])
+        else:
+            nil
 
-    exportRefObjectC(sym, fields, constructor)
+    exportRefObjectC(cfg, sym, fields, constructor)
     exportRefObjectCpp(sym, fields, constructor)
 
     if procsBlock[1].len > 0:
         var procsSeen: seq[string]
+
         for entry in procsBlock[1].asStmtList:
             var
                 procSym = procTypedSym(entry)
@@ -295,13 +321,15 @@ macro exportRefObjectTyped(body: typed) =
                 procsSeen.add procSym.repr
             else:
                 let procType = procSym.getTypeInst()
+
                 if procType[0].len > 2:
                     prefixes.add(procType[0][2][1])
 
-            exportProcC(procSym, sym, prefixes)
+            exportProcC(cfg, procSym, sym, prefixes)
             exportProcCpp(procSym, sym, prefixes)
 
     exportCloseObjectCpp()
+
 
 template exportRefObject*(sym, body: untyped) =
     ## Exports a ref object, with these sections:
@@ -309,6 +337,7 @@ template exportRefObject*(sym, body: untyped) =
     ## * constructor
     ## * procs
     exportRefObjectTyped(exportRefObjectUntyped(sym, body))
+
 
 macro writeFiles*(config: static[Config]) =
     if Target.c in config.targets:

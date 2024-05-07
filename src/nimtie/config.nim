@@ -24,8 +24,6 @@ type
         ## Configuration for generated C bindings.
         ## Note that some of these settings also apply to generated C++ bindings.
         braceStyle*: BraceStyle = BraceStyle.sameLine
-        fixedWidthInt*: bool = true ## \
-      ## Whether to use `[u]int##_t` types instead of `int`, `long`, etc.
         includeGuard*: string = "" ## \
       ## Note that this is not mutually-exclusive with `pragmaOnce`.
         includes*: seq[string] = @[] ## \
@@ -37,7 +35,7 @@ type
         structPrefix*: string = "" ## \
       ## Prepended to the name of every generated struct declaration.
 
-    Config* = object
+    Config* {.byref.} = object
         ## Passed to `proc writeFiles`_.
         directory*: string = "."
         filename*: string = "mylib"

@@ -6,59 +6,83 @@ var
     types {.compiletime.}: string
     procs {.compiletime.}: string
 
-proc exportTypeC(sym: NimNode): string =
+proc exportTypeC(cfg: Config, sym: NimNode): string =
     if sym.kind == nnkBracketExpr:
         if sym[0].repr == "array":
             let
                 entryCount = sym[1].repr
-                entryType = exportTypeC(sym[2])
+                entryType = exportTypeC(cfg, sym[2])
 
             result = &"{entryType}[{entryCount}]"
         elif sym[0].repr == "seq":
             result = sym.getSeqName()
         else:
             error(&"Unexpected bracket expression {sym[0].repr}[")
+    elif sym.kind == nnkPtrTy:
+        result = &"{exportTypeC(cfg, sym[0])}*"
+    elif sym.kind == nnkVarTy:
+        result = &"{exportTypeC(cfg, sym[0])}*"
     else:
-        result =
-            case sym.repr:
-            of "string": "char*"
-            of "bool": "char"
-            of "byte": "char"
-            of "int8": "char"
-            of "int16": "short"
-            of "int32": "int"
-            of "int64": "long long"
-            of "int": "long long"
-            of "uint8": "unsigned char"
-            of "uint16": "unsigned short"
-            of "uint32": "unsigned int"
-            of "uint64": "unsigned long long"
-            of "uint": "unsigned long long"
+        result = case sym.repr:
+            # Nim's types...
+            of "bool": "bool"
+            of "byte": "uint8_t"
+            of "cstring": "char*"
             of "float32": "float"
-            of "float64": "double"
-            of "float": "double"
+            of "float64", "float": "double"
+            of "int":
+                if sizeof(int) == 8: "int64_t"
+                elif sizeof(int) == 4: "int32_t"
+                else: error("unsupported `int` size"); ""
+            of "int8": "int8_t"
+            of "int16": "int16_t"
+            of "int32": "int32_t"
+            of "int64": "int64_t"
+            of "uint":
+                if sizeof(uint) == 8: "uint64_t"
+                elif sizeof(uint) == 4: "uint32_t"
+                else: error("unsupported `uint` size"); ""
+            of "uint8": "uint8_t"
+            of "uint16": "uint16_t"
+            of "uint32": "uint32_t"
+            of "uint64": "uint64_t"
             of "Rune": "int"
             of "Vec2": "Vector2"
             of "Mat3": "Matrix3"
             of "", "nil": "void"
             of "None": "void"
-            else:
-                sym.repr
+            # C compatibility types...
+            of "cchar": "char"
+            of "cdouble": "double"
+            of "cfloat": "float"
+            of "cint": "int"
+            of "clong": "long"
+            of "clongdouble": "long double"
+            of "clonglong": "long long"
+            of "cschar": "signed char"
+            of "csize_t": "size_t"
+            of "cstringarray": "char**"
+            of "cuchar": "unsigned char"
+            of "cuint": "unsigned int"
+            of "culong": "unsigned long"
+            of "culonglong": "unsigned long long"
+            of "cushort": "unsigned short"
+            else: sym.repr
 
 
-proc exportTypeC(sym: NimNode, name: string): string =
+proc exportTypeC(cfg: Config, sym: NimNode, name: string): string =
     if sym.kind == nnkBracketExpr:
         if sym[0].repr == "array":
             let
                 entryCount = sym[1].repr
-                entryType = exportTypeC(sym[2], &"{name}[{entryCount}]")
+                entryType = exportTypeC(cfg, sym[2], &"{name}[{entryCount}]")
             result = &"{entryType}"
         elif sym[0].repr == "seq":
             result = sym.getSeqName() & " " & name
         else:
             error(&"Unexpected bracket expression {sym[0].repr}[")
     else:
-        result = exportTypeC(sym) & " " & name
+        result = exportTypeC(cfg, sym) & " " & name
 
 
 proc dllProc*(procName: string, args: openarray[string], restype: string) =
@@ -73,6 +97,7 @@ proc dllProc*(procName: string, args: openarray[string], restype: string) =
 
 
 proc dllProc*(
+    cfg: Config,
     procName: string,
     args: openarray[(NimNode, NimNode)],
     restype: string
@@ -80,7 +105,7 @@ proc dllProc*(
     var argsConverted: seq[string]
 
     for (argName, argType) in args:
-        argsConverted.add exportTypeC(argType, toSnakeCase(argName.getName()))
+        argsConverted.add exportTypeC(cfg, argType, toSnakeCase(argName.getName()))
 
     dllProc(procName, argsConverted, restype)
 
@@ -105,9 +130,10 @@ proc exportEnumC*(sym: NimNode) =
 
 
 proc exportProcC*(
-  sym: NimNode,
-  owner: NimNode = nil,
-  prefixes: openarray[NimNode] = []
+    cfg: Config,
+    sym: NimNode,
+    owner: NimNode = nil,
+    prefixes: openarray[NimNode] = []
 ) =
     let
         procName = sym.repr
@@ -156,31 +182,31 @@ proc exportProcC*(
     for param in procParams:
         dllParams.add((param[0], param[1]))
 
-    dllProc(&"$lib_{apiProcName}", dllParams, exportTypeC(procReturn))
+    dllProc(cfg, &"$lib_{apiProcName}", dllParams, exportTypeC(cfg, procReturn))
 
 
-proc exportObjectC*(sym: NimNode, constructor: NimNode) =
+proc exportObjectC*(cfg: Config, sym: NimNode, constructor: NimNode) =
     let objName = sym.repr
 
     types.add &"typedef struct {objName} " & "{\n"
 
     for identDefs in sym.getImpl()[2][2]:
         for property in identDefs[0 .. ^3]:
-            types.add &"  {exportTypeC(identDefs[^2], toSnakeCase(property[1].repr))};\n"
+            types.add &"  {exportTypeC(cfg, identDefs[^2], toSnakeCase(property[1].repr))};\n"
 
     types.add "} " & &"{objName};\n\n"
 
     if constructor != nil:
-        exportProcC(constructor)
+        exportProcC(cfg, constructor)
     else:
         procs.add &"{objName} $lib_{toSnakeCase(objName)}("
         for identDefs in sym.getImpl()[2][2]:
             for property in identDefs[0 .. ^3]:
-                procs.add &"{exportTypeC(identDefs[^2], toSnakeCase(property[1].repr))}, "
+                procs.add &"{exportTypeC(cfg, identDefs[^2], toSnakeCase(property[1].repr))}, "
         procs.removeSuffix ", "
         procs.add ");\n\n"
 
-    dllProc(&"$lib_{toSnakeCase(objName)}_eq", [&"{objName} a", &"{objName} b"], "char")
+    dllProc(&"$lib_{toSnakeCase(objName)}_eq", [&"{objName} a", &"{objName} b"], "bool")
 
 
 proc genRefObject(objName: string) =
@@ -191,19 +217,20 @@ proc genRefObject(objName: string) =
     dllProc(unrefLibProc, [objName & " " & toSnakeCase(objName)], "void")
 
 
-proc genSeqProcs(objName, procPrefix, selfSuffix: string, entryType: NimNode) =
+proc genSeqProcs(cfg: Config, objName, procPrefix, selfSuffix: string, entryType: NimNode) =
     let objArg = objName & " " & toSnakeCase(objName)
 
     dllProc(&"{procPrefix}_len", [objArg], "long long")
-    dllProc(&"{procPrefix}_get", [objArg, "long long index"], exportTypeC(entryType))
-    dllProc(&"{procPrefix}_set", [objArg, "long long index", exportTypeC(
+    dllProc(&"{procPrefix}_get", [objArg, "long long index"], exportTypeC(cfg, entryType))
+    dllProc(&"{procPrefix}_set", [objArg, "long long index", exportTypeC(cfg,
             entryType, "value")], "void")
     dllProc(&"{procPrefix}_delete", [objArg, "long long index"], "void")
-    dllProc(&"{procPrefix}_add", [objArg, exportTypeC(entryType, "value")], "void")
+    dllProc(&"{procPrefix}_add", [objArg, exportTypeC(cfg, entryType, "value")], "void")
     dllProc(&"{procPrefix}_clear", [objArg], "void")
 
 
 proc exportRefObjectC*(
+    cfg: Config,
     sym: NimNode,
     fields: seq[(string, NimNode)],
     constructor: NimNode
@@ -225,7 +252,7 @@ proc exportRefObjectC*(
         var dllParams: seq[(NimNode, NimNode)]
         for param in constructorParams:
             dllParams.add((param[0], param[1]))
-        dllProc(constructorLibProc, dllParams, objName)
+        dllProc(cfg, constructorLibProc, dllParams, objName)
 
     for (fieldName, fieldType) in fields:
         let fieldNameSnaked = toSnakeCase(fieldName)
@@ -235,23 +262,24 @@ proc exportRefObjectC*(
 
             let setProcName = &"$lib_{objNameSnaked}_set_{fieldNameSnaked}"
 
-            dllProc(getProcName, [objName & " " & objNameSnaked], exportTypeC(fieldType))
-            dllProc(setProcName, [objName & " " & objNameSnaked, exportTypeC(
-                    fieldType, "value")], exportTypeC(nil))
+            dllProc(getProcName, [objName & " " & objNameSnaked], exportTypeC(cfg, fieldType))
+            dllProc(setProcName, [objName & " " & objNameSnaked, exportTypeC(cfg,
+                    fieldType, "value")], exportTypeC(cfg, nil))
         else:
             var helperName = fieldName
             helperName[0] = toUpperAscii(helperName[0])
             let helperClassName = objName & helperName
 
             genSeqProcs(
-              objName,
-              &"$lib_{objNameSnaked}_{fieldNameSnaked}",
-              &".{toSnakeCase(objName)}",
-              fieldType[1]
+                cfg,
+                objName,
+                &"$lib_{objNameSnaked}_{fieldNameSnaked}",
+                &".{toSnakeCase(objName)}",
+                fieldType[1]
             )
 
 
-proc exportSeqC*(sym: NimNode) =
+proc exportSeqC*(cfg: Config, sym: NimNode) =
     let
         seqName = sym.getName()
         seqNameSnaked = toSnakeCase(seqName)
@@ -263,6 +291,7 @@ proc exportSeqC*(sym: NimNode) =
     dllProc(newSeqProc, seqName)
 
     genSeqProcs(
+        cfg,
         sym.getName(),
         &"$lib_{seqNameSnaked}",
         "",
