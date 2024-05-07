@@ -35,6 +35,7 @@ type
             ## Note that this is not mutually-exclusive with `pragmaOnce`.
         includes*: seq[string] = @["<stdbool.h>", "<stddef.h>", "<stdint.h>",] ## \
             ## Each string is written as-is, so quotes or angle brackets must be included.
+        paramNaming*: Naming = Naming.camelCase
         pragmaOnce*: bool = true ## \
             ## Note that this is not mutually-exclusive with `includeGuard`.
         procPrefix*: string = "" ## \

@@ -96,6 +96,17 @@ proc toVarCase*(s: string): string =
         result.add s[i .. ^1]
 
 
+proc renameParam*(cfg: Config, name: string): string =
+    case cfg.c.paramNaming:
+    of Naming.geckoCase: error("unimplemented"); return ""
+    of Naming.lowerCase: return name.toLowerAscii()
+    of Naming.upperCase: return name.toUpperAscii()
+    of Naming.pascalCase: return name.toPascalCase()
+    of Naming.camelCase: return name.toCamelCase()
+    of Naming.snakeCase: return name.toSnakeCase()
+    of Naming.upperSnakeCase: return name.toCapSnakeCase()
+
+
 proc renameProc*(cfg: Config, name: string): string =
     case cfg.c.procNaming:
     of Naming.geckoCase: error("unimplemented"); return ""
@@ -112,6 +123,7 @@ proc getSeqName*(sym: NimNode): string =
         result = &"Seq{sym[1]}"
     else:
         result = &"Seq{sym}"
+
     result[3] = toUpperAscii(result[3])
 
 

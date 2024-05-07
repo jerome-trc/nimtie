@@ -106,6 +106,12 @@ proc dllProc*(
 ) =
     var argsConverted: seq[string]
 
+    if args.len < 1:
+        argsConverted.add("void")
+    else:
+        for (argName, argType) in args:
+            argsConverted.add(exportTypeC(cfg, argType, renameParam(cfg, argName.getName())))
+
     for (argName, argType) in args:
         argsConverted.add(exportTypeC(cfg, argType, toSnakeCase(argName.getName())))
 
@@ -244,11 +250,11 @@ proc genRefObject(objName: string) =
 proc genSeqProcs(cfg: Config, objName, procPrefix, selfSuffix: string, entryType: NimNode) =
     let objArg = objName & " " & toSnakeCase(objName)
 
-    dllProc(&"{procPrefix}_len", [objArg], "long long")
-    dllProc(&"{procPrefix}_get", [objArg, "long long index"], exportTypeC(cfg, entryType))
-    dllProc(&"{procPrefix}_set", [objArg, "long long index", exportTypeC(cfg,
+    dllProc(&"{procPrefix}_len", [objArg], "size_t")
+    dllProc(&"{procPrefix}_get", [objArg, "size_t index"], exportTypeC(cfg, entryType))
+    dllProc(&"{procPrefix}_set", [objArg, "size_t index", exportTypeC(cfg,
             entryType, "value")], "void")
-    dllProc(&"{procPrefix}_delete", [objArg, "long long index"], "void")
+    dllProc(&"{procPrefix}_delete", [objArg, "size_t index"], "void")
     dllProc(&"{procPrefix}_add", [objArg, exportTypeC(cfg, entryType, "value")], "void")
     dllProc(&"{procPrefix}_clear", [objArg], "void")
 
