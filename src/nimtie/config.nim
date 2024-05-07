@@ -48,7 +48,11 @@ type
     Config* {.byref.} = object
         ## Passed to `proc writeFiles`_.
         directory*: string = "."
+        header*: string = "" ## \
+            ## Added to the very beginning of the file as-is.
         filename*: string = "mylib"
         targets*: Targets = {} ## \
             ## What languages should bindings be generated for?
+        trailer*: string = "" ## \
+            ## Added to the very end of the file as-is.
         c*: CConfig

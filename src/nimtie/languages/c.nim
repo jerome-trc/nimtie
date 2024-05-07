@@ -328,7 +328,7 @@ proc exportSeqC*(cfg: Config, sym: NimNode) =
 proc writeC*(cfg: Config) =
     let dir = cfg.directory
 
-    var output = ""
+    var output = cfg.header
 
     if cfg.c.pragmaOnce:
         output &= "#pragma once\n\n"
@@ -359,5 +359,7 @@ proc writeC*(cfg: Config) =
 
     if cfg.c.includeGuard.len > 0:
         output &= &"#endif // {cfg.c.includeGuard}\n"
+
+    output &= cfg.trailer
 
     writeFile(&"{dir}/{cfg.filename}.h", output)
