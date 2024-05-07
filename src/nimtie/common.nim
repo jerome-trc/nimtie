@@ -1,20 +1,22 @@
-import macros, strformat, strutils
+import std/[macros, strformat, strutils]
+
+import config
 
 const basicTypes* = [
-  "bool",
-  "int8",
-  "uint8",
-  "int16",
-  "uint16",
-  "int32",
-  "uint32",
-  "int64",
-  "uint64",
-  "int",
-  "uint",
-  "float32",
-  "float64",
-  "float"
+    "bool",
+    "int8",
+    "uint8",
+    "int16",
+    "uint16",
+    "int32",
+    "uint32",
+    "int64",
+    "uint64",
+    "int",
+    "uint",
+    "float32",
+    "float64",
+    "float"
 ]
 
 proc toSnakeCase*(s: string): string =
@@ -23,12 +25,31 @@ proc toSnakeCase*(s: string): string =
     for i, c in s:
         if c in {'A' .. 'Z'}:
             if result.len > 0 and result[^1] != '_' and not prevCap:
-                result.add '_'
+                result.add('_')
             prevCap = true
-            result.add c.toLowerAscii()
+            result.add(c.toLowerAscii())
         else:
             prevCap = false
-            result.add c
+            result.add(c)
+
+
+proc toCamelCase*(s: string): string =
+    ## Converts nim_type to nimType.
+    var cap = false
+    var ret = ""
+
+    for i, c in s:
+        if c == '_':
+            cap = true
+        else:
+            if cap:
+                ret.add(c.toUpperAscii())
+                cap = false
+            else:
+                ret.add(c)
+
+    return ret
+
 
 proc toCapSnakeCase*(s: string): string =
     ## Converts NimType to NIM_TYPE.
@@ -42,18 +63,24 @@ proc toCapSnakeCase*(s: string): string =
             prevCap = false
         result.add c.toUpperAscii()
 
-proc toCamelCase*(s: string): string =
+
+proc toPascalCase*(s: string): string =
     ## Converts nim_type to NimType.
     var cap = true
+    var ret = ""
+
     for i, c in s:
         if c == '_':
             cap = true
         else:
             if cap:
-                result.add c.toUpperAscii()
+                ret.add(c.toUpperAscii())
                 cap = false
             else:
-                result.add c
+                ret.add(c)
+
+    return ret
+
 
 proc toVarCase*(s: string): string =
     ## Converts NimType to nimType.
@@ -68,6 +95,18 @@ proc toVarCase*(s: string): string =
     if i < s.len:
         result.add s[i .. ^1]
 
+
+proc renameProc*(cfg: Config, name: string): string =
+    case cfg.c.procNaming:
+    of Naming.geckoCase: error("unimplemented"); return ""
+    of Naming.lowerCase: return name.toLowerAscii()
+    of Naming.upperCase: return name.toUpperAscii()
+    of Naming.pascalCase: return name.toPascalCase()
+    of Naming.camelCase: return name.toCamelCase()
+    of Naming.snakeCase: return name.toSnakeCase()
+    of Naming.upperSnakeCase: return name.toCapSnakeCase()
+
+
 proc getSeqName*(sym: NimNode): string =
     if sym.kind == nnkBracketExpr:
         result = &"Seq{sym[1]}"
@@ -75,11 +114,13 @@ proc getSeqName*(sym: NimNode): string =
         result = &"Seq{sym}"
     result[3] = toUpperAscii(result[3])
 
+
 proc getName*(sym: NimNode): string =
     if sym.kind == nnkBracketExpr:
         sym.getSeqName()
     else:
         sym.repr
+
 
 proc raises*(procSym: NimNode): bool =
     for pragma in procSym.getImpl()[4]:

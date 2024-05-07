@@ -34,10 +34,10 @@ macro exportConstsUntyped(body: untyped) =
         result.add varSection
 
 
-macro exportConstsTyped(body: typed) =
+macro exportConstsTyped(cfg: static[Config], body: typed) =
     for varSection in body.asStmtList:
         let sym = varSection[0][0]
-        exportConstC(sym)
+        exportConstC(cfg, sym)
         exportConstCpp(sym)
 
 
@@ -56,16 +56,16 @@ macro exportEnumsUntyped(body: untyped) =
         result.add varSection
 
 
-macro exportEnumsTyped(body: typed) =
+macro exportEnumsTyped(cfg: static[Config], body: typed) =
     for varSection in body.asStmtList:
         let sym = varSection[0][1]
-        exportEnumC(sym)
+        exportEnumC(cfg, sym)
         exportEnumCpp(sym)
 
 
-template exportEnums*(body: untyped) =
+template exportEnums*(cfg: Config, body: untyped) =
     ## Exports a list of enums.
-    exportEnumsTyped(exportEnumsUntyped(body))
+    exportEnumsTyped(cfg, exportEnumsUntyped(body))
 
 
 proc fieldUntyped(clause, owner: NimNode): NimNode =
@@ -167,7 +167,7 @@ macro exportObjectUntyped(sym, body: untyped) =
     result.add procsBlock
 
 
-macro exportObjectTyped(body: typed) =
+macro exportObjectTyped(cfg: static[Config], body: typed) =
     let
         sym = body[0][0][1]
         constructorBlock = body[1]
@@ -179,7 +179,7 @@ macro exportObjectTyped(body: typed) =
     else:
         nil
 
-    exportObjectC(Config(), sym, constructor)
+    exportObjectC(cfg, sym, constructor)
     exportObjectCpp(sym, constructor)
 
     if procsBlock[1].len > 0:
@@ -194,18 +194,18 @@ macro exportObjectTyped(body: typed) =
                 let procType = procSym.getTypeInst()
                 if procType[0].len > 2:
                     prefixes.add(procType[0][2][1])
-            exportProcC(Config(), procSym, sym, prefixes)
+            exportProcC(cfg, procSym, sym, prefixes)
             exportProcCpp(procSym, sym, prefixes)
 
     exportCloseObjectCpp()
 
 
-template exportObject*(sym, body: untyped) =
+template exportObject*(cfg: Config, sym, body: untyped) =
     ## Exports an object, with these sections:
     ## * fields
     ## * constructor
     ## * procs
-    exportObjectTyped(exportObjectUntyped(sym, body))
+    exportObjectTyped(cfg, exportObjectUntyped(sym, body))
 
 
 macro exportSeqUntyped(sym, body: untyped) =

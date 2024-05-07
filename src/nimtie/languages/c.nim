@@ -1,9 +1,11 @@
 import std/[macros, strformat, strutils]
 
-import ../config, ../common
+import ../[config, common]
 
 var
-    types {.compiletime.}: string
+    enumerations {.compiletime.}: string
+    typeDecls {.compiletime.}: string
+    typeDefs {.compiletime.}: string
     procs {.compiletime.}: string
 
 proc exportTypeC(cfg: Config, sym: NimNode): string =
@@ -89,11 +91,11 @@ proc dllProc*(procName: string, args: openarray[string], restype: string) =
     var argStr = ""
 
     for arg in args:
-        argStr.add &"{arg}, "
+        argStr.add(&"{arg}, ")
 
-    argStr.removeSuffix ", "
-    procs.add &"{restype} {procName}({argStr});\n"
-    procs.add "\n"
+    argStr.removeSuffix(", ")
+    procs.add(&"{restype} {procName}({argStr});\n")
+    procs.add("\n")
 
 
 proc dllProc*(
@@ -105,7 +107,7 @@ proc dllProc*(
     var argsConverted: seq[string]
 
     for (argName, argType) in args:
-        argsConverted.add exportTypeC(cfg, argType, toSnakeCase(argName.getName()))
+        argsConverted.add(exportTypeC(cfg, argType, toSnakeCase(argName.getName())))
 
     dllProc(procName, argsConverted, restype)
 
@@ -115,18 +117,28 @@ proc dllProc*(procName: string, restype: string) =
     dllProc(procName, a, restype)
 
 
-proc exportConstC*(sym: NimNode) =
-    types.add &"#define {toCapSnakeCase(sym.repr)} {sym.getImpl()[2].repr}\n"
-    types.add "\n"
+proc exportConstC*(cfg: Config, sym: NimNode) =
+    typeDefs.add(&"#define {toCapSnakeCase(sym.repr)} {sym.getImpl()[2].repr}\n")
+    typeDefs.add("\n")
 
 
-proc exportEnumC*(sym: NimNode) =
-    types.add &"typedef char {sym.repr};\n"
+proc exportEnumC*(cfg: Config, sym: NimNode) =
+    let enumSize = sym.getSize()
+
+    let underlying = case enumSize:
+        of 1: "uint8_t"
+        of 2: "uint16_t"
+        of 4: "uint32_t"
+        of 8: "uint64_t"
+        else: error(&"enum size cannot be handled: {enumSize}"); ""
+
+    enumerations.add(&"typedef {underlying} {cfg.c.enumPrefix}{sym.repr};\n\n")
+    enumerations.add("enum {\n")
 
     for i, entry in sym.getImpl()[2][1 .. ^1]:
-        types.add &"#define {toCapSnakeCase(entry.repr)} {i}\n"
+        enumerations.add(&"\t{toCapSnakeCase(sym.repr)}_{toCapSnakeCase(entry.repr)},\n")
 
-    types.add "\n"
+    enumerations.add("};\n\n")
 
 
 proc exportProcC*(
@@ -137,7 +149,7 @@ proc exportProcC*(
 ) =
     let
         procName = sym.repr
-        procNameSnaked = toSnakeCase(procName)
+        procNameSnaked = renameProc(cfg, procName)
         procType = sym.getTypeInst()
         procParams = procType[0][1 .. ^1]
         procReturn = procType[0][0]
@@ -145,12 +157,12 @@ proc exportProcC*(
     var apiProcName = ""
 
     if owner != nil:
-        apiProcName.add &"{toSnakeCase(owner.getName())}_"
+        apiProcName.add(&"{toSnakeCase(owner.getName())}_")
 
     for prefix in prefixes:
-        apiProcName.add &"{toSnakeCase(prefix.getName())}_"
+        apiProcName.add(&"{toSnakeCase(prefix.getName())}_")
 
-    apiProcName.add &"{procNameSnaked}"
+    apiProcName.add(&"{procNameSnaked}")
 
     var defaults: seq[(string, NimNode)]
 
@@ -170,47 +182,59 @@ proc exportProcC*(
             ""
     if comments != "":
         let lines = comments.replace("## ", "").split("\n")
-        procs.add "/**\n"
 
         for line in lines:
-            procs.add &" * {line}\n"
-
-        procs.add " */\n"
+            procs.add(&"/// {line}\n")
 
     var dllParams: seq[(NimNode, NimNode)]
 
     for param in procParams:
         dllParams.add((param[0], param[1]))
 
-    dllProc(cfg, &"$lib_{apiProcName}", dllParams, exportTypeC(cfg, procReturn))
+    dllProc(cfg, &"{cfg.c.procPrefix}{apiProcName}", dllParams, exportTypeC(cfg, procReturn))
 
 
 proc exportObjectC*(cfg: Config, sym: NimNode, constructor: NimNode) =
     let objName = sym.repr
 
-    types.add &"typedef struct {objName} " & "{\n"
+    typeDefs.add(&"typedef struct {objName} " & "{\n")
 
     for identDefs in sym.getImpl()[2][2]:
         for property in identDefs[0 .. ^3]:
-            types.add &"  {exportTypeC(cfg, identDefs[^2], toSnakeCase(property[1].repr))};\n"
+            typeDefs.add(&"  {exportTypeC(cfg, identDefs[^2], toSnakeCase(property[1].repr))};\n")
 
-    types.add "} " & &"{objName};\n\n"
+    typeDefs.add("} " & &"{objName};\n\n")
 
     if constructor != nil:
         exportProcC(cfg, constructor)
     else:
-        procs.add &"{objName} $lib_{toSnakeCase(objName)}("
+        case cfg.c.procNaming:
+        of Naming.geckoCase:
+            error("unimplemented");
+        of Naming.lowerCase:
+            procs.add(&"{objName} {cfg.c.procPrefix}{objName.toCamelCase()}new(")
+        of Naming.upperCase:
+            procs.add(&"{objName} {cfg.c.procPrefix}{objName.toCamelCase()}NEW(")
+        of Naming.pascalCase, Naming.camelCase:
+            procs.add(&"{objName} {cfg.c.procPrefix}{objName.toCamelCase()}New(")
+        of Naming.snakeCase:
+            procs.add(&"{objName} {cfg.c.procPrefix}{objName.toSnakeCase()}_new(")
+        of Naming.upperSnakeCase:
+            procs.add(&"{objName} {cfg.c.procPrefix}{objName.toCapSnakeCase()}_NEW(")
+
         for identDefs in sym.getImpl()[2][2]:
             for property in identDefs[0 .. ^3]:
-                procs.add &"{exportTypeC(cfg, identDefs[^2], toSnakeCase(property[1].repr))}, "
-        procs.removeSuffix ", "
-        procs.add ");\n\n"
+                procs.add(&"{exportTypeC(cfg, identDefs[^2], toSnakeCase(property[1].repr))}, ")
 
-    dllProc(&"$lib_{toSnakeCase(objName)}_eq", [&"{objName} a", &"{objName} b"], "bool")
+        procs.removeSuffix(", ")
+        procs.add(");\n\n")
+
+    when false: # TODO?
+        dllProc(&"$lib_{toSnakeCase(objName)}_eq", [&"{objName} a", &"{objName} b"], "bool")
 
 
 proc genRefObject(objName: string) =
-    types.add &"typedef long long {objName};\n\n"
+    typeDefs.add(&"typedef long long {objName};\n\n")
 
     let unrefLibProc = &"$lib_{toSnakeCase(objName)}_unref"
 
@@ -238,7 +262,7 @@ proc exportRefObjectC*(
     let
         objName = sym.repr
         objNameSnaked = toSnakeCase(objName)
-        objType = sym.getType()[1].getType()
+        objType {.used.} = sym.getType()[1].getType()
 
     genRefObject(objName)
 
@@ -247,11 +271,13 @@ proc exportRefObjectC*(
             constructorLibProc = &"$lib_{toSnakeCase(constructor.repr)}"
             constructorType = constructor.getTypeInst()
             constructorParams = constructorType[0][1 .. ^1]
-            constructorRaises = constructor.raises()
+            constructorRaises {.used.} = constructor.raises()
 
         var dllParams: seq[(NimNode, NimNode)]
+
         for param in constructorParams:
             dllParams.add((param[0], param[1]))
+
         dllProc(cfg, constructorLibProc, dllParams, objName)
 
     for (fieldName, fieldType) in fields:
@@ -268,7 +294,7 @@ proc exportRefObjectC*(
         else:
             var helperName = fieldName
             helperName[0] = toUpperAscii(helperName[0])
-            let helperClassName = objName & helperName
+            let helperClassName {.used.} = objName & helperName
 
             genSeqProcs(
                 cfg,
@@ -301,7 +327,6 @@ proc exportSeqC*(cfg: Config, sym: NimNode) =
 
 proc writeC*(cfg: Config) =
     let dir = cfg.directory
-    let lib = cfg.filename
 
     var output = ""
 
@@ -317,7 +342,9 @@ proc writeC*(cfg: Config) =
     if cfg.c.includes.len > 0:
         output &= "\n"
 
-    output &= types.replace("$lib", cfg.c.structPrefix)
+    output &= enumerations
+    output &= typeDecls
+    output &= typeDefs.replace("$lib", cfg.c.structPrefix)
     output &= procs.replace("$lib", cfg.c.procPrefix)
 
     if cfg.c.includeGuard.len > 0:
