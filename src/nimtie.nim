@@ -239,10 +239,10 @@ macro exportSeqTyped(cfg: static[Config], body: typed) =
     exportCloseObjectCpp()
 
 
-template exportSeq*(sym, body: untyped) =
+template exportSeq*(cfg: Config, sym, body: untyped) =
     ## Exports a regular sequence.
     ## * procs section
-    exportSeqTyped(exportSeqUntyped(sym, body))
+    exportSeqTyped(cfg, exportSeqUntyped(sym, body))
 
 
 macro exportRefObjectUntyped(sym, body: untyped) =

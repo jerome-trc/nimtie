@@ -4,8 +4,10 @@ import ../[config, common]
 
 var
     enumerations {.compiletime.}: string
+    seqs {.compiletime.}: string
     typeDecls {.compiletime.}: string
     typeDefs {.compiletime.}: string
+        ## Complete types that rely on `enumerations`, `seqs`, and `typeDecls`.
     procs {.compiletime.}: string
 
 proc exportTypeC(cfg: Config, sym: NimNode): string =
@@ -94,7 +96,12 @@ proc dllProc*(procName: string, args: openarray[string], restype: string) =
         argStr.add(&"{arg}, ")
 
     argStr.removeSuffix(", ")
-    procs.add(&"{restype} {procName}({argStr});\n")
+
+    if args.len < 1:
+        procs.add(&"{restype} {procName}(void);\n")
+    else:
+        procs.add(&"{restype} {procName}({argStr});\n")
+
     procs.add("\n")
 
 
@@ -111,9 +118,6 @@ proc dllProc*(
     else:
         for (argName, argType) in args:
             argsConverted.add(exportTypeC(cfg, argType, renameParam(cfg, argName.getName())))
-
-    for (argName, argType) in args:
-        argsConverted.add(exportTypeC(cfg, argType, toSnakeCase(argName.getName())))
 
     dllProc(procName, argsConverted, restype)
 
@@ -221,8 +225,10 @@ proc exportObjectC*(cfg: Config, sym: NimNode, constructor: NimNode) =
             procs.add(&"{objName} {cfg.c.procPrefix}{objName.toCamelCase()}new(")
         of Naming.upperCase:
             procs.add(&"{objName} {cfg.c.procPrefix}{objName.toCamelCase()}NEW(")
-        of Naming.pascalCase, Naming.camelCase:
+        of Naming.camelCase:
             procs.add(&"{objName} {cfg.c.procPrefix}{objName.toCamelCase()}New(")
+        of Naming.pascalCase:
+            procs.add(&"{objName} {cfg.c.procPrefix}{objName.toPascalCase()}New(")
         of Naming.snakeCase:
             procs.add(&"{objName} {cfg.c.procPrefix}{objName.toSnakeCase()}_new(")
         of Naming.upperSnakeCase:
@@ -240,20 +246,19 @@ proc exportObjectC*(cfg: Config, sym: NimNode, constructor: NimNode) =
 
 
 proc genRefObject(objName: string) =
-    typeDefs.add(&"typedef long long {objName};\n\n")
+    typeDefs.add(&"typedef void* {objName};\n\n")
 
     let unrefLibProc = &"$lib_{toSnakeCase(objName)}_unref"
 
     dllProc(unrefLibProc, [objName & " " & toSnakeCase(objName)], "void")
 
 
-proc genSeqProcs(cfg: Config, objName, procPrefix, selfSuffix: string, entryType: NimNode) =
+proc genSeqProcs(cfg: Config, objName, procPrefix: string, entryType: NimNode) =
     let objArg = objName & " " & toSnakeCase(objName)
 
     dllProc(&"{procPrefix}_len", [objArg], "size_t")
     dllProc(&"{procPrefix}_get", [objArg, "size_t index"], exportTypeC(cfg, entryType))
-    dllProc(&"{procPrefix}_set", [objArg, "size_t index", exportTypeC(cfg,
-            entryType, "value")], "void")
+    dllProc(&"{procPrefix}_set", [objArg, "size_t index", exportTypeC(cfg, entryType, "value")], "void")
     dllProc(&"{procPrefix}_delete", [objArg, "size_t index"], "void")
     dllProc(&"{procPrefix}_add", [objArg, exportTypeC(cfg, entryType, "value")], "void")
     dllProc(&"{procPrefix}_clear", [objArg], "void")
@@ -269,8 +274,6 @@ proc exportRefObjectC*(
         objName = sym.repr
         objNameSnaked = toSnakeCase(objName)
         objType {.used.} = sym.getType()[1].getType()
-
-    genRefObject(objName)
 
     if constructor != nil:
         let
@@ -306,30 +309,108 @@ proc exportRefObjectC*(
                 cfg,
                 objName,
                 &"$lib_{objNameSnaked}_{fieldNameSnaked}",
-                &".{toSnakeCase(objName)}",
                 fieldType[1]
             )
 
 
 proc exportSeqC*(cfg: Config, sym: NimNode) =
-    let
-        seqName = sym.getName()
-        seqNameSnaked = toSnakeCase(seqName)
+    let seqName = sym.getName()
 
-    genRefObject(seqName)
+    echo sym[1].getImpl.treeRepr
 
-    let newSeqProc = &"$lib_new_{toSnakeCase(seqName)}"
+    if cfg.c.braceStyle == BraceStyle.sameLine:
+        seqs.add &"""
+typedef struct Seq{sym[1].repr}_ {{
+    NimInt len;
+    struct {{ NimInt cap; {sym[1].repr} d[]; }}* p;
+}} Seq{sym[1].repr};
 
-    dllProc(newSeqProc, seqName)
+"""
+    else:
+        seqs.add &"""
+typedef struct Seq{sym[1].repr}_
+{{
+    NimInt len;
+    struct {{ NimInt cap; {sym[1].repr} d[]; }}* p;
+}} Seq{sym[1].repr};
+
+"""
+
+    let seqProcPrefix = case cfg.c.procNaming:
+        of Naming.geckoCase:
+            error("unimplemented"); ""
+        of Naming.lowerCase:
+            &"{cfg.c.procPrefix}{seqName.toLowerAscii()}"
+        of Naming.upperCase:
+            &"{cfg.c.procPrefix}{seqName.toUpperAscii()}"
+        of Naming.camelCase:
+            &"{cfg.c.procPrefix}{seqName.toCamelCase()}"
+        of Naming.pascalCase:
+            &"{cfg.c.procPrefix}{seqName.toPascalCase()}"
+        of Naming.snakeCase:
+            &"{cfg.c.procPrefix}{seqName.toSnakeCase()}"
+        of Naming.upperSnakeCase:
+            &"{cfg.c.procPrefix}{seqName.toCapSnakeCase()}"
+
+    case cfg.c.procNaming:
+        of Naming.geckoCase:
+            error("unimplemented");
+        of Naming.lowerCase:
+            dllProc(seqProcPrefix & "new", seqName)
+        of Naming.upperCase:
+            dllProc(seqProcPrefix & "NEW", seqName)
+        of Naming.camelCase, Naming.pascalCase:
+           dllProc(seqProcPrefix & "New", seqName)
+        of Naming.snakeCase:
+            dllProc(seqProcPrefix & "_new", seqName)
+        of Naming.upperSnakeCase:
+            dllProc(seqProcPrefix & "_NEW", seqName)
 
     genSeqProcs(
         cfg,
         sym.getName(),
-        &"$lib_{seqNameSnaked}",
-        "",
+        seqProcPrefix,
         sym[1]
     )
 
+
+const externCSameLineBrace = """
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+"""
+
+const externCNewLineBrace = """
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
+"""
+
+const externCClosing = """
+#ifdef __cplusplus
+}
+#endif
+"""
+
+const nimStringSameLineBrace = """
+typedef struct _NimString {
+    NimInt len;
+    void* data;
+} NimString;
+
+"""
+
+const nimStringNewLineBrace = """
+typedef struct _NimString
+{
+    NimInt len;
+    void* data;
+} NimString;
+
+"""
 
 proc writeC*(cfg: Config) =
     let dir = cfg.directory
@@ -348,20 +429,33 @@ proc writeC*(cfg: Config) =
     if cfg.c.includes.len > 0:
         output &= "\n"
 
+    when sizeof(int) == 8:
+        output &= "typedef int64_t NimInt;\n\n"
+    elif sizeof(int) == 4:
+        output &= "typedef int32_t NimInt;\n\n"
+    else:
+        {.fatal: "unsupported integer size".}
+
+    if cfg.c.braceStyle == BraceStyle.sameLine:
+        output &= nimStringSameLineBrace
+    else:
+        output &= nimStringNewLineBrace
+
     output &= enumerations
+    output &= seqs
     output &= typeDecls
     output &= typeDefs.replace("$lib", cfg.c.structPrefix)
 
     if cfg.c.cxxCompat:
         if cfg.c.braceStyle == BraceStyle.sameLine:
-            output &= "#ifdef __cplusplus\nextern \"C\" {\n#endif\n\n"
+            output &= externCSameLineBrace
         else:
-            output &= "#ifdef __cplusplus\nextern \"C\"\n{\n#endif\n"
+            output &= externCNewLineBrace
 
     output &= procs.replace("$lib", cfg.c.procPrefix)
 
     if cfg.c.cxxCompat:
-        output &= "#ifdef __cplusplus\n}\n#endif\n"
+        output &= externCClosing
 
     if cfg.c.includeGuard.len > 0:
         output &= &"#endif // {cfg.c.includeGuard}\n"
