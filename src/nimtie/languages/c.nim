@@ -311,6 +311,12 @@ proc writeC*(cfg: Config) =
     if cfg.c.includeGuard.len > 0:
         output &= &"#ifndef {cfg.c.includeGuard}\n#define {cfg.c.includeGuard}\n\n"
 
+    for incl in cfg.c.includes:
+        output &= &"#include {incl}\n"
+
+    if cfg.c.includes.len > 0:
+        output &= "\n"
+
     output &= types.replace("$lib", cfg.c.structPrefix)
     output &= procs.replace("$lib", cfg.c.procPrefix)
 
