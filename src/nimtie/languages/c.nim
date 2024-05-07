@@ -429,6 +429,8 @@ proc writeC*(cfg: Config) =
     if cfg.c.includes.len > 0:
         output &= "\n"
 
+    output &= cfg.c.afterIncludes
+
     when sizeof(int) == 8:
         output &= "typedef int64_t NimInt;\n\n"
     elif sizeof(int) == 4:

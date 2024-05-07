@@ -28,6 +28,8 @@ type
     CConfig* = object
         ## Configuration for generated C bindings.
         ## Note that some of these settings also apply to generated C++ bindings.
+        afterIncludes*: string = "" ## \
+            ## Code added after the include blocks as-is.
         braceStyle*: BraceStyle = BraceStyle.sameLine
         cxxCompat*: bool = false
         enumPrefix*: string = ""
