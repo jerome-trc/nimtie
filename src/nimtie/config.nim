@@ -33,6 +33,7 @@ type
         braceStyle*: BraceStyle = BraceStyle.sameLine
         cxxCompat*: bool = false
         enumPrefix*: string = ""
+        fieldNaming*: Naming = Naming.camelCase
         includeGuard*: string = "" ## \
             ## Note that this is not mutually-exclusive with `pragmaOnce`.
         includes*: seq[string] = @["<stdbool.h>", "<stddef.h>", "<stdint.h>",] ## \

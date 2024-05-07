@@ -117,7 +117,8 @@ proc dllProc*(
         argsConverted.add("void")
     else:
         for (argName, argType) in args:
-            argsConverted.add(exportTypeC(cfg, argType, renameParam(cfg, argName.getName())))
+            let n = rename(cfg.c.paramNaming, argName.getName())
+            argsConverted.add(exportTypeC(cfg, argType, n))
 
     dllProc(procName, argsConverted, restype)
 
@@ -159,7 +160,7 @@ proc exportProcC*(
 ) =
     let
         procName = sym.repr
-        procNameSnaked = renameProc(cfg, procName)
+        procNameSnaked = rename(cfg.c.procNaming, procName)
         procType = sym.getTypeInst()
         procParams = procType[0][1 .. ^1]
         procReturn = procType[0][0]
@@ -207,11 +208,16 @@ proc exportProcC*(
 proc exportObjectC*(cfg: Config, sym: NimNode, constructor: NimNode) =
     let objName = sym.repr
 
-    typeDefs.add(&"typedef struct {objName} " & "{\n")
+    if cfg.c.braceStyle == BraceStyle.sameLine:
+        typeDefs.add(&"typedef struct {objName} " & "{\n")
+    else:
+        typeDefs.add(&"typedef struct {objName}\n" & "{\n")
 
     for identDefs in sym.getImpl()[2][2]:
         for property in identDefs[0 .. ^3]:
-            typeDefs.add(&"  {exportTypeC(cfg, identDefs[^2], toSnakeCase(property[1].repr))};\n")
+            let f = rename(cfg.c.fieldNaming, property[1].repr)
+            let t = exportTypeC(cfg, identDefs[^2], f)
+            typeDefs.add(&"    {t};\n")
 
     typeDefs.add("} " & &"{objName};\n\n")
 
@@ -315,23 +321,24 @@ proc exportRefObjectC*(
 
 proc exportSeqC*(cfg: Config, sym: NimNode) =
     let seqName = sym.getName()
-
-    echo sym[1].getImpl.treeRepr
+    let lenName = rename(cfg.c.fieldNaming, "len")
+    let dataName = rename(cfg.c.fieldNaming, "d")
+    let payloadName = rename(cfg.c.fieldNaming, "p")
 
     if cfg.c.braceStyle == BraceStyle.sameLine:
         seqs.add &"""
-typedef struct Seq{sym[1].repr}_ {{
-    NimInt len;
-    struct {{ NimInt cap; {sym[1].repr} d[]; }}* p;
+typedef struct _Seq{sym[1].repr} {{
+    NimInt {lenName};
+    struct {{ NimInt cap; {sym[1].repr} {dataName}[]; }}* {payloadName};
 }} Seq{sym[1].repr};
 
 """
     else:
         seqs.add &"""
-typedef struct Seq{sym[1].repr}_
+typedef struct _Seq{sym[1].repr}
 {{
-    NimInt len;
-    struct {{ NimInt cap; {sym[1].repr} d[]; }}* p;
+    NimInt {lenName};
+    struct {{ NimInt cap; {sym[1].repr} {dataName}[]; }}* {payloadName};
 }} Seq{sym[1].repr};
 
 """
@@ -395,23 +402,6 @@ const externCClosing = """
 #endif
 """
 
-const nimStringSameLineBrace = """
-typedef struct _NimString {
-    NimInt len;
-    void* data;
-} NimString;
-
-"""
-
-const nimStringNewLineBrace = """
-typedef struct _NimString
-{
-    NimInt len;
-    void* data;
-} NimString;
-
-"""
-
 proc writeC*(cfg: Config) =
     let dir = cfg.directory
 
@@ -438,10 +428,27 @@ proc writeC*(cfg: Config) =
     else:
         {.fatal: "unsupported integer size".}
 
+    let lenName = rename(cfg.c.fieldNaming, "len")
+    let dataName = rename(cfg.c.fieldNaming, "d")
+    let payloadName = rename(cfg.c.fieldNaming, "p")
+
     if cfg.c.braceStyle == BraceStyle.sameLine:
-        output &= nimStringSameLineBrace
+        output &= &"""
+typedef struct _NimString {{
+    NimInt {lenName};
+    struct {{ NimInt cap; char {dataName}[]; }}* {payloadName};
+}} NimString;
+
+"""
     else:
-        output &= nimStringNewLineBrace
+        output &= &"""
+typedef struct _NimString
+{{
+    NimInt {lenName};
+    struct {{ NimInt cap; char {dataName}[]; }}* {payloadName};
+}} NimString;
+
+"""
 
     output &= enumerations
     output &= seqs
