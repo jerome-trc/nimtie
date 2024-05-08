@@ -31,6 +31,7 @@ proc exportTypeC(cfg: Config, sym: NimNode): string =
             # Nim's types...
             of "bool": "bool"
             of "byte": "uint8_t"
+            of "string": "NimString"
             of "cstring": "char*"
             of "float32": "float"
             of "float64", "float": "double"
@@ -53,6 +54,7 @@ proc exportTypeC(cfg: Config, sym: NimNode): string =
             of "Rune": "int"
             of "Vec2": "Vector2"
             of "Mat3": "Matrix3"
+            of "pointer": "void*"
             of "", "nil": "void"
             of "None": "void"
             # C compatibility types...
