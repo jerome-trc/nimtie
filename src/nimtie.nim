@@ -41,9 +41,9 @@ macro exportConstsTyped(cfg: static[Config], body: typed) =
         exportConstCpp(sym)
 
 
-template exportConsts*(body: untyped) =
+template exportConsts*(cfg: Config, body: untyped) =
     ## Exports a list of constants.
-    exportConstsTyped(exportConstsUntyped(body))
+    exportConstsTyped(cfg, exportConstsUntyped(body))
 
 
 macro exportEnumsUntyped(body: untyped) =
