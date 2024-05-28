@@ -83,21 +83,23 @@ proc procUntyped(clause: NimNode): NimNode =
         let
             name = clause
             varSection = quote do:
-                var p = `name`
-        result[1].add varSection
+                var p {.used.} = `name`
+        result[1].add(varSection)
     else:
         var
             name = clause[0]
             endStmt = quote do:
                 discard2 `name`()
+
         for i in 1 ..< clause.len:
             var
                 argType = clause[i]
                 argName = ident(&"arg{i}")
             result[1].add quote do:
-                var `argName`: `argType`
-            endStmt[1].add argName
-        result[1].add endStmt
+                var `argName` {.used.}: `argType`
+            endStmt[1].add(argName)
+
+        result[1].add(endStmt)
 
 
 proc procTypedSym(entry: NimNode): NimNode =
